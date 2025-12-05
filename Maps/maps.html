@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Établissements Scolaires Français</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.2);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      --accent-primary: rgba(156, 39, 176, 0.8);
+      --accent-secondary: rgba(103, 58, 183, 0.6);
+      --text-primary: rgba(255, 255, 255, 0.95);
+      --text-secondary: rgba(255, 255, 255, 0.7);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      background: #000;
+    }
+
+    /* Spline 3D Background - Bottom Layer */
+    .spline-viewer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    spline-viewer {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Map Container - Positioned much higher */
+    .map-container {
+      position: fixed;
+      top: 10%; /* Moved much higher from 50% */
+      left: 50%;
+      transform: translate(-50%, 0); /* Changed from -50% to 0 for top positioning */
+      width: 75%;
+      max-width: 1200px;
+      height: 65vh;
+      min-height: 450px;
+      z-index: 10;
+      border-radius: 24px;
+      overflow: hidden;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      box-shadow: 
+        var(--glass-shadow),
+        0 0 100px rgba(156, 39, 176, 0.3),
+        0 0 200px rgba(103, 58, 183, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .map-container:hover {
+      box-shadow: 
+        0 12px 48px rgba(0, 0, 0, 0.3),
+        0 0 120px rgba(156, 39, 176, 0.4),
+        0 0 250px rgba(103, 58, 183, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    /* Map Header */
+    .map-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(156, 39, 176, 0.7) 0%,
+        rgba(103, 58, 183, 0.6) 100%
+      );
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      color: var(--text-primary);
+      padding: 20px 30px;
+      z-index: 11;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .map-header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        to right,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+      );
+      z-index: -1;
+    }
+
+    .map-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .map-header p {
+      margin: 6px 0 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+      font-weight: 400;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+    }
+
+    /* Map Container */
+    #map {
+      width: 100%;
+      height: calc(100% - 80px);
+      margin-top: 80px;
+      border-radius: 0 0 24px 24px;
+      overflow: hidden;
+    }
+
+    /* Legend */
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(20, 20, 30, 0.6);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      padding: 15px 18px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 1000;
+      font-size: 13px;
+      color: var(--text-primary);
+      min-width: 160px;
+    }
+
+    /* Schools List Panel */
+    .schools-list {
+      position: absolute;
+      top: 100px;
+      right: 20px;
+      width: 280px;
+      max-height: calc(100% - 140px);
+      background: rgba(20, 20, 30, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 18px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 1000;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .schools-list::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(156, 39, 176, 0.1) 0%,
+        rgba(103, 58, 183, 0.05) 100%
+      );
+      border-radius: 16px;
+      z-index: -1;
+    }
+
+    .schools-list h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      border-bottom: 2px solid rgba(156, 39, 176, 0.5);
+      padding-bottom: 8px;
+    }
+
+    .schools-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .schools-list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+
+    .schools-list::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, rgba(156, 39, 176, 0.6), rgba(103, 58, 183, 0.6));
+      border-radius: 10px;
+    }
+
+    .schools-list::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, rgba(156, 39, 176, 0.8), rgba(103, 58, 183, 0.8));
+    }
+
+    .school-item {
+      padding: 10px;
+      margin: 6px 0;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border-left: 3px solid rgba(156, 39, 176, 0.6);
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .school-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-left-color: rgba(156, 39, 176, 1);
+      transform: translateX(5px);
+      box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+    }
+
+    .school-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .school-location {
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .school-type-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: linear-gradient(135deg, rgba(156, 39, 176, 0.4), rgba(103, 58, 183, 0.4));
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 4px;
+    }
+
+    .legend::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(156, 39, 176, 0.1) 0%,
+        rgba(103, 58, 183, 0.05) 100%
+      );
+      border-radius: 16px;
+      z-index: -1;
+    }
+
+    .legend h3 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      gap: 10px;
+    }
+
+    .legend-marker {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+      flex-shrink: 0;
+    }
+
+    /* Enhanced Custom Popup Styling */
+    .leaflet-popup-content-wrapper {
+      border-radius: 14px !important;
+      background: rgba(25, 25, 35, 0.85) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      box-shadow: 
+        0 8px 30px rgba(0, 0, 0, 0.4),
+        0 0 25px rgba(156, 39, 176, 0.3) !important;
+      padding: 2px !important;
+      overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+      margin: 15px !important;
+      font-family: 'Segoe UI', 'Arial', sans-serif !important;
+      color: var(--text-primary) !important;
+      min-width: 200px !important;
+    }
+
+    .leaflet-popup-tip {
+      background: rgba(25, 25, 35, 0.85) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+
+    .popup-title {
+      margin: 0 0 8px 0 !important;
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      color: var(--text-primary) !important;
+      line-height: 1.3;
+    }
+
+    .popup-city {
+      margin: 0 0 12px 0 !important;
+      font-size: 14px !important;
+      color: var(--text-secondary) !important;
+      font-weight: 500;
+    }
+
+    .popup-type {
+      display: inline-block;
+      padding: 3px 10px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Map Controls Styling */
+    .leaflet-control-zoom {
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      background: rgba(20, 20, 30, 0.7) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      border-radius: 8px !important;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    .leaflet-control-zoom a {
+      background: transparent !important;
+      color: var(--text-primary) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+      transition: all 0.3s ease !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .leaflet-control-scale {
+      background: rgba(20, 20, 30, 0.7) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      color: var(--text-primary) !important;
+      border-radius: 8px !important;
+      padding: 4px 8px !important;
+    }
+
+    /* Floating Particles Effect */
+    .floating-particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(156, 39, 176, 0.6);
+      border-radius: 50%;
+      animation: float 3s infinite ease-in-out;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+      50% { transform: translateY(-20px) rotate(180deg); opacity: 0.2; }
+    }
+
+    /* Title for bottom section */
+    .bottom-title {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 5;
+      color: var(--text-primary);
+      font-size: 36px;
+      font-weight: 700;
+      text-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+      letter-spacing: 1px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      padding: 20px;
+      animation: glow 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from {
+        text-shadow: 0 0 10px rgba(156, 39, 176, 0.7),
+                     0 0 20px rgba(156, 39, 176, 0.5),
+                     0 0 30px rgba(103, 58, 183, 0.3);
+      }
+      to {
+        text-shadow: 0 0 20px rgba(156, 39, 176, 0.9),
+                     0 0 30px rgba(156, 39, 176, 0.7),
+                     0 0 40px rgba(103, 58, 183, 0.5);
+      }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+      .map-container {
+        width: 85%;
+        height: 70vh;
+        top: 12%;
+      }
+      
+      .map-header {
+        padding: 18px 25px;
+      }
+      
+      .map-header h1 {
+        font-size: 22px;
+      }
+
+      .schools-list {
+        width: 250px;
+        top: 90px;
+        right: 15px;
+        max-height: calc(100% - 120px);
+      }
+
+      .bottom-title {
+        font-size: 32px;
+        bottom: 50px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .map-container {
+        width: 92%;
+        height: 75vh;
+        border-radius: 20px;
+        top: 10%;
+      }
+
+      .map-header {
+        padding: 15px 20px;
+      }
+
+      .map-header h1 {
+        font-size: 20px;
+      }
+
+      .map-header p {
+        font-size: 13px;
+      }
+
+      .legend {
+        bottom: 15px;
+        left: 15px;
+        padding: 12px 15px;
+        font-size: 12px;
+        min-width: 140px;
+      }
+
+      .legend h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .schools-list {
+        position: relative;
+        top: auto;
+        right: auto;
+        width: calc(100% - 30px);
+        max-height: 250px;
+        margin: 15px;
+      }
+
+      .leaflet-popup-content {
+        min-width: 180px !important;
+        margin: 12px !important;
+      }
+
+      .popup-title {
+        font-size: 15px !important;
+      }
+
+      .bottom-title {
+        font-size: 28px;
+        bottom: 40px;
+        padding: 15px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .map-container {
+        width: 95%;
+        height: 80vh;
+        border-radius: 16px;
+        top: 8%;
+      }
+
+      .map-header {
+        padding: 12px 16px;
+      }
+
+      .map-header h1 {
+        font-size: 18px;
+      }
+
+      .map-header p {
+        font-size: 12px;
+      }
+
+      .legend {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        margin: 12px;
+        width: calc(100% - 24px);
+      }
+
+      .bottom-title {
+        font-size: 24px;
+        bottom: 30px;
+        padding: 10px;
+      }
+    }
+  </style>
+  <style>
+     /* Modern Animated Navbar */
+        .cyber-navbar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 25px;
+            z-index: 2000;
+            background: rgba(15, 25, 40, 0.85);
+            backdrop-filter: blur(20px);
+            padding: 15px 40px;
+            border-radius: 60px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: navbarSlideDown 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            opacity: 0;
+        }
+
+        @keyframes navbarSlideDown {
+            from {
+                transform: translateX(-50%) translateY(-100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .nav-item {
+            position: relative;
+            padding: 12px 28px;
+            text-decoration: none;
+            color: #a0b3e0;
+            font-weight: 600;
+            font-size: 16px;
+            letter-spacing: 1px;
+            border-radius: 40px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(102, 126, 234, 0.1) 0%, 
+                rgba(118, 75, 162, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            border-radius: 40px;
+        }
+
+        .nav-item:hover {
+            color: white;
+            transform: translateY(-5px) scale(1.05);
+            border-color: rgba(102, 126, 234, 0.3);
+            box-shadow: 
+                0 15px 30px rgba(102, 126, 234, 0.2),
+                0 0 20px rgba(102, 126, 234, 0.1);
+        }
+
+        .nav-item:hover::before {
+            opacity: 1;
+        }
+
+        .nav-item i {
+            font-size: 20px;
+            transition: all 0.4s ease;
+        }
+
+        .nav-item:hover i {
+            transform: scale(1.2) rotate(5deg);
+            color: #FCC624;
+        }
+
+        .nav-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: linear-gradient(135deg, #FCC624, #ff9a00);
+            color: #000;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 20px;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 15px rgba(252, 198, 36, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(252, 198, 36, 0.5);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 25px rgba(252, 198, 36, 0.8);
+            }
+        }
+
+        .nav-tooltip {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(15, 25, 40, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 15px 25px;
+            border-radius: 15px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .nav-item:hover .nav-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(20px);
+        }
+
+        /* Particle effects */
+        .nav-particle {
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        /* Active state */
+        .nav-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 
+                0 10px 25px rgba(102, 126, 234, 0.4),
+                0 0 15px rgba(102, 126, 234, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Floating animation for navbar */
+        @keyframes floatNavbar {
+            0%, 100% {
+                transform: translateX(-50%) translateY(0);
+            }
+            50% {
+                transform: translateX(-50%) translateY(-10px);
+            }
+        }
+
+        .cyber-navbar {
+            animation: navbarSlideDown 1s ease-out forwards, floatNavbar 6s ease-in-out infinite 1s;
+        }
+
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .cyber-navbar {
+                gap: 15px;
+                padding: 12px 30px;
+            }
+            
+            .nav-item {
+                padding: 10px 20px;
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .cyber-navbar {
+                flex-direction: column;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                transform: none;
+                animation: navbarSlideDownMobile 1s ease-out forwards;
+                border-radius: 20px;
+                padding: 20px;
+                gap: 12px;
+            }
+
+            @keyframes navbarSlideDownMobile {
+                from {
+                    transform: translateY(-100px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+            }
+            
+            .nav-item {
+                padding: 15px;
+                justify-content: center;
+                border-radius: 15px;
+            }
+            
+            .nav-badge {
+                top: 5px;
+                right: 5px;
+            }
+        }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    color: #00aaff; /* Bleu pour tout le texte */
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+}
+
+  </style>
+</head>
+<body>
+  <nav class="cyber-navbar">
+        <div class="nav-item" data-url="loading2.html">
+            <i class="fas fa-robot"></i>
+            <span>ChatBot AI</span>
+            <div class="nav-tooltip">Assistant IA intelligent pour vous guider</div>
+            <div class="notification-dot"></div>
+        </div>
+        
+        <div class="nav-item" data-url="../Main/loading3.html">
+            <i class="fas fa-gamepad"></i>
+            <span>Snack Game</span>
+            <div class="nav-tooltip">Jeu rétro Snake avec un twist moderne</div>
+        </div>
+        
+        <div class="nav-item" data-url="../Main/loading4.html">
+            <i class="fas fa-ghost"></i>
+            <span>Retro Zone</span>
+            <div class="nav-tooltip">Collection de jeux rétro classiques</div>
+        </div>
+    </nav>
+  <!-- Spline 3D Background -->
+  <div class="spline-viewer">
+    <spline-viewer url="https://prod.spline.design/gt98koaT7kr0n1Py/scene.splinecode"></spline-viewer>
+  </div>
+
+  <!-- Floating Particles -->
+  <div class="floating-particles" id="particles"></div>
+
+  <!-- OpenStreetMap Container -->
+  <div class="map-container">
+    <div class="map-header">
+      <h1>La carte des pilotes</h1>
+      <p>Collèges et Lycées à travers la France</p>
+    </div>
+    
+    <div id="map"></div>
+
+    <div class="legend">
+      <h3>Légende</h3>
+      <div class="legend-item">
+        <div class="legend-marker"></div>
+        <span>Établissement Scolaire</span>
+      </div>
+    </div>
+
+    <!-- Schools List Panel -->
+    <div class="schools-list" id="schoolsList">
+      <h3>📚 Liste des pilotes</h3>
+      <div id="schoolsListContent"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Title -->
+
+
+  <!-- Leaflet JavaScript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <script>
+    // Remove Spline logo
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        var splineViewer = document.querySelector('spline-viewer');
+        if (splineViewer && splineViewer.shadowRoot) {
+          var logo = splineViewer.shadowRoot.querySelector('#logo');
+          if (logo) logo.remove();
+        }
+      }, 1000);
+    });
+
+    // Create floating particles
+    function createParticles() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 15;
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        // Random position
+        particle.style.left = `${Math.random() * 100}%`;
+        particle.style.top = `${Math.random() * 100}%`;
+        
+        // Random animation delay
+        particle.style.animationDelay = `${Math.random() * 2}s`;
+        
+        // Random size
+        const size = 1 + Math.random() * 3;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        // Random opacity
+        particle.style.opacity = 0.3 + Math.random() * 0.4;
+        
+        particlesContainer.appendChild(particle);
+      }
+    }
+
+    // Initialize OpenStreetMap with Leaflet
+    document.addEventListener('DOMContentLoaded', function() {
+      // Create particles
+      createParticles();
+      
+      // Create map centered on France
+      const map = L.map('map', {
+        center: [46.603354, 1.888334],
+        zoom: 6,
+        minZoom: 2,
+        maxZoom: 18,
+        zoomControl: false
+      });
+
+      // Add zoom control
+      L.control.zoom({
+        position: 'topright'
+      }).addTo(map);
+
+      // Add OpenStreetMap tiles with dark theme
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxZoom: 19,
+        subdomains: 'abcd'
+      }).addTo(map);
+
+      // Educational Institutions Data
+      const institutions = [
+        {
+          name: 'Lycée général et technologique Jacques Prévert',
+          position: [47.2159, -1.5424],
+          city: 'Nantes',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée général Bellevue',
+          position: [43.9298, 2.1479],
+          city: 'Albi',
+          type: 'Lycée'
+        },
+        {
+          name: 'Collège Coat-Mez',
+          position: [48.3692, -4.2781],
+          city: 'Daoulas',
+          type: 'Collège'
+        },
+        {
+          name: 'Collège des 7 Vallées',
+          position: [50.3765, 2.0301],
+          city: 'Hesdin',
+          type: 'Collège'
+        },
+        {
+          name: 'Collège Les Cuvelles',
+          position: [47.2451, 6.0225],
+          city: 'Besançon',
+          type: 'Collège'
+        },
+        {
+          name: 'Collège Victor Vasarely',
+          position: [45.7640, 4.8357],
+          city: 'Lyon',
+          type: 'Collège'
+        },
+        {
+          name: 'École élémentaire publique Louis Barrié',
+          position: [44.8378, -0.5792],
+          city: 'Bordeaux',
+          type: 'École Élémentaire'
+        },
+        {
+          name: 'Lycée général et technologique Alain Borne',
+          position: [45.4475, 4.3875],
+          city: 'Montélimar',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée polyvalent Carnot',
+          position: [48.8845, 2.3078],
+          city: 'Paris',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée général et technologique de la Plaine de l\'Ain',
+          position: [46.1052, 5.2362],
+          city: 'Péronnas',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée polyvalent Heinrich-Nessel',
+          position: [48.5846, 7.7507],
+          city: 'Haguenau',
+          type: 'Lycée Professionnel'
+        },
+        {
+          name: 'Lycée général et technologique Jacques Prévert',
+          position: [49.4432, 1.0995],
+          city: 'Pont-Audemer',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée polyvalent Jean Monnet',
+          position: [46.5802, 0.3404],
+          city: 'Montmorillon',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée général et technologique La Martinière Diderot',
+          position: [45.7485, 4.8467],
+          city: 'Lyon',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée général et technologique Marie Curie',
+          position: [43.6047, 1.4442],
+          city: 'Toulouse',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée professionnel Jean Lurçat',
+          position: [47.9029, 1.9093],
+          city: 'Orléans',
+          type: 'Lycée Professionnel'
+        },
+        {
+          name: 'Lycée polyvalent Simone de Beauvoir',
+          position: [43.9493, 4.8055],
+          city: 'Gargas',
+          type: 'Lycée'
+        },
+        {
+          name: 'Lycée polyvalent Vincent d\'Indy',
+          position: [44.9333, 4.8903],
+          city: 'Privas',
+          type: 'Lycée'
+        }
+      ];
+
+      // Custom marker icon with glow effect
+      const customIcon = L.divIcon({
+        html: `
+          <div style="
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 12px rgba(102, 126, 234, 0.8);
+            position: relative;
+          ">
+            <div style="
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 6px;
+              height: 6px;
+              background: white;
+              border-radius: 50%;
+            "></div>
+          </div>
+        `,
+        className: 'custom-marker',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+
+      // Add markers for each institution
+      const markers = {};
+      
+      institutions.forEach((institution, index) => {
+        const marker = L.marker(institution.position, { icon: customIcon })
+          .addTo(map)
+          .bindPopup(`
+            <div style="min-width: 200px;">
+              <h3 class="popup-title">${institution.name}</h3>
+              <p class="popup-city">📍 ${institution.city}, France</p>
+              <div style="margin-top: 12px;">
+                <span class="popup-type">${institution.type}</span>
+              </div>
+            </div>
+          `);
+
+        markers[index] = marker;
+
+        // Open popup on hover with slight delay
+        let hoverTimeout;
+        marker.on('mouseover', function() {
+          hoverTimeout = setTimeout(() => {
+            this.openPopup();
+          }, 300);
+        });
+
+        marker.on('mouseout', function() {
+          clearTimeout(hoverTimeout);
+          setTimeout(() => {
+            if (!this._popup._source._popup._isOpen) {
+              this.closePopup();
+            }
+          }, 100);
+        });
+
+        // Ensure popup closes properly
+        marker.on('popupclose', function() {
+          clearTimeout(hoverTimeout);
+        });
+      });
+
+      // Populate schools list
+      const schoolsListContent = document.getElementById('schoolsListContent');
+      institutions.forEach((institution, index) => {
+        const schoolItem = document.createElement('div');
+        schoolItem.className = 'school-item';
+        schoolItem.innerHTML = `
+          <div class="school-name">${institution.name}</div>
+          <div class="school-location">📍 ${institution.city}</div>
+          <div class="school-type-badge">${institution.type}</div>
+        `;
+        
+        // Click event to zoom to marker
+        schoolItem.addEventListener('click', () => {
+          map.setView(institution.position, 13);
+          markers[index].openPopup();
+        });
+        
+        schoolsListContent.appendChild(schoolItem);
+      });
+
+      // Add scale control
+      L.control.scale({
+        position: 'bottomleft',
+        imperial: false
+      }).addTo(map);
+
+      // Add attribution control with styling
+      L.control.attribution({
+        position: 'bottomright',
+        prefix: '<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>'
+      }).addTo(map);
+    });
+  </script>
+
+  <!-- Load Spline Viewer -->
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.12.6/build/spline-viewer.js"></script>
+</body>
+</html>
