@@ -1,0 +1,49 @@
+body {
+    margin: 0;
+    font-family: sans-serif;
+    color: #333333;
+    overflow: hidden;
+}
+
+#3d-container {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    background-color: #FFFFFF;
+}
+
+/* --- INFO PANEL STYLES --- */
+#info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    max-width: 300px;
+    color: white;
+
+    /* Add a smooth transition for the fade effect */
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* --- This class will hide the panel --- */
+.hidden {
+    opacity: 0; /* Make it transparent */
+    pointer-events: none; /* Make it non-interactive */
+}
+
+#component-info {
+    margin-top: 15px;
+    min-height: 50px;
+}
+
+#component-name {
+    margin: 0;
+    color: #FCC624; /* The official Linux yellow */
+}
+
+#component-description {
+    margin: 5px 0 0 0;
+    font-size: 14px;
+}
